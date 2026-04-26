@@ -1,144 +1,49 @@
 -- Settings
-local MAIN_COLOR = Color3.fromRGB(20, 20, 20)
-local SWAP_COLOR = Color3.fromRGB(85, 0, 255) -- Purple for sync swap
+local TAG_NAME = "SyncActive_Token"
+local REQUEST_TAG = "SwapRequest" 
 
--- 1. Main UI Setup
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SyncSwapGui"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = game:GetService("CoreGui")
+-- 1. Setup Tags
+local lp = game.Players.LocalPlayer
+local function setupTags(char)
+    if not char then return end
+    if not char:FindFirstChild(TAG_NAME) then
+        Instance.new("StringValue", char).Name = TAG_NAME
+    end
+    local req = char:FindFirstChild(REQUEST_TAG) or Instance.new("StringValue", char)
+    req.Name = REQUEST_TAG
+    req.Value = ""
+end
+setupTags(lp.Character or lp.CharacterAdded:Wait())
+lp.CharacterAdded:Connect(setupTags)
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 250)
+-- 2. UI Setup
+local screenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 150, 0, 200)
 mainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
-mainFrame.BackgroundColor3 = MAIN_COLOR
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.Active = true
 mainFrame.Draggable = true
-mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame)
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "Select Partner"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 16
-title.Parent = mainFrame
-
--- 2. SCROLLING LIST
-local scroll = Instance.new("ScrollingFrame")
+local scroll = Instance.new("ScrollingFrame", mainFrame)
 scroll.Size = UDim2.new(1, -10, 1, -40)
 scroll.Position = UDim2.new(0, 5, 0, 35)
 scroll.BackgroundTransparency = 1
-scroll.BorderSizePixel = 0
-scroll.ScrollBarThickness = 4
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-scroll.Parent = mainFrame
+scroll.CanvasSize = UDim2.new(0,0,0,0)
 
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 5)
-layout.Parent = scroll
-
--- 3. SWAP BUTTON
-local swapBtn = Instance.new("TextButton")
+local swapBtn = Instance.new("TextButton", mainFrame)
 swapBtn.Size = UDim2.new(1, -10, 1, -40)
 swapBtn.Position = UDim2.new(0, 5, 0, 35)
-swapBtn.BackgroundColor3 = SWAP_COLOR
-swapBtn.Text = "SWAP PLACES"
-swapBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-swapBtn.Font = Enum.Font.SourceSansBold
-swapBtn.TextSize = 18
+swapBtn.Text = "SWAP"
 swapBtn.Visible = false
-swapBtn.Parent = mainFrame
 Instance.new("UICorner", swapBtn)
 
-local backBtn = Instance.new("TextButton")
-backBtn.Size = UDim2.new(0, 20, 0, 20)
-backBtn.Position = UDim2.new(1, -25, 0, 5)
-backBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-backBtn.Text = "X"
-backBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-backBtn.Visible = false
-backBtn.Parent = mainFrame
-Instance.new("UICorner", backBtn, UDim.new(1, 0))
-
--- 4. THE SWAP LOGIC
+-- 3. The Logic
 local targetPlayer = nil
 
-local function updateList()
-    for _, item in pairs(scroll:GetChildren()) do
-        if item:IsA("TextButton") then item:Destroy() end
-    end
-    for _, p in pairs(game.Players:GetPlayers()) do
-        if p ~= game.Players.LocalPlayer then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -5, 0, 35)
-            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            btn.Text = p.DisplayName
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Parent = scroll
-            Instance.new("UICorner", btn)
-            
-            btn.MouseButton1Click:Connect(function()
-                targetPlayer = p
-                mainFrame.Size = UDim2.new(0, 120, 0, 80) -- Smaller compact size
-                title.Text = "Partner: " .. p.Name
-                title.TextSize = 10
-                scroll.Visible = false
-                swapBtn.Visible = true
-                backBtn.Visible = true
-            end)
-        end
-    end
-    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-end
-
-swapBtn.MouseButton1Click:Connect(function()
-    local lp = game.Players.LocalPlayer
-    if targetPlayer and targetPlayer.Character and lp.Character then
-        local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
-        local hisRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
-        if myRoot and hisRoot then
-            -- TRADING LOCATIONS:
-            -- We grab BOTH positions before moving anyone
-            local myOldCF = myRoot.CFrame
-            local hisOldCF = hisRoot.CFrame
-            
-            -- Move me to him
-            myRoot.CFrame = hisOldCF
-            
-            -- Move him to me
-            -- (Note: This may only work if the game allows you to move others, 
-            -- or if he is also running the script and you both click near-simultaneously)
-            hisRoot.CFrame = myOldCF
-        end
-    end
-end)
-
-backBtn.MouseButton1Click:Connect(function()
-    targetPlayer = nil
-    mainFrame.Size = UDim2.new(0, 200, 0, 250)
-    title.Text = "Select Partner"
-    title.TextSize = 16
-    scroll.Visible = true
-    swapBtn.Visible = false
-    backBtn.Visible = false
-end)
-
-game.Players.PlayerAdded:Connect(updateList)
-game.Players.PlayerRemoving:Connect(updateList)
-updateList()
-    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-end
-
--- Teleport Logic
-swapBtn.MouseButton1Click:Connect(function()
-    local lp = game.Players.LocalPlayer
+-- The Actual Movement Function
+local function executeMove()
     if targetPlayer and targetPlayer.Character and lp.Character then
         local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
         local hisRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -146,28 +51,55 @@ swapBtn.MouseButton1Click:Connect(function()
             myRoot.CFrame = hisRoot.CFrame
         end
     end
-end)
+end
 
--- Back to list
-backBtn.MouseButton1Click:Connect(function()
-    targetPlayer = nil
-    mainFrame.Size = UDim2.new(0, 200, 0, 250) -- Expand
-    title.Text = "Select Player"
-    title.TextSize = 16
-    scroll.Visible = true
-    swapBtn.Visible = false
-    backBtn.Visible = false
-end)
-
--- AUTO-REFRESH EVENTS
-game.Players.PlayerAdded:Connect(updateList)
-game.Players.PlayerRemoving:Connect(function(p)
-    if p == targetPlayer then
-        -- If your partner leaves, force the menu to expand so you can pick a new one
-        backBtn:MouseButton1Click()
+-- Watch for his request
+local function watchTarget(p)
+    if p.Character then
+        local req = p.Character:WaitForChild(REQUEST_TAG, 5)
+        if req then
+            req.Changed:Connect(function(val)
+                if val == "Trigger" then
+                    executeMove()
+                    task.wait(0.5)
+                    -- Reset local value so we don't loop
+                end
+            end)
+        end
     end
-    updateList()
+end
+
+-- Clicking the Button
+swapBtn.MouseButton1Click:Connect(function()
+    local myReq = lp.Character:FindFirstChild(REQUEST_TAG)
+    if myReq then
+        executeMove() -- I move myself
+        myReq.Value = "Trigger" -- This signal tells HIS script to move him
+        task.wait(0.1)
+        myReq.Value = "" -- Reset
+    end
 end)
 
--- Initial Load
-updateList()
+local function updateList()
+    for _, v in pairs(scroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    for _, p in pairs(game.Players:GetPlayers()) do
+        if p ~= lp and p.Character and p.Character:FindFirstChild(TAG_NAME) then
+            local btn = Instance.new("TextButton", scroll)
+            btn.Size = UDim2.new(1, 0, 0, 30)
+            btn.Text = p.DisplayName
+            btn.MouseButton1Click:Connect(function()
+                targetPlayer = p
+                scroll.Visible = false
+                swapBtn.Visible = true
+                mainFrame.Size = UDim2.new(0, 100, 0, 80)
+                watchTarget(p) -- Start listening for his clicks
+            end)
+        end
+    end
+end
+
+-- Refresh loop
+spawn(function()
+    while task.wait(2) do if scroll.Visible then updateList() end end
+end)
+
