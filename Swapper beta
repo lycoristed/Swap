@@ -1,0 +1,124 @@
+-- Settings
+local MAIN_COLOR = Color3.fromRGB(25, 25, 25)
+local SWAP_COLOR = Color3.fromRGB(0, 160, 255)
+
+-- 1. Main UI Setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CompactSwapGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = game:GetService("CoreGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 250) -- Start Large
+mainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+mainFrame.BackgroundColor3 = MAIN_COLOR
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Select Player"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 16
+title.Parent = mainFrame
+
+-- 2. Scrolling List (Selection Phase)
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -10, 1, -40)
+scroll.Position = UDim2.new(0, 5, 0, 35)
+scroll.BackgroundTransparency = 1
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.ScrollBarThickness = 2
+scroll.Parent = mainFrame
+
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 5)
+layout.Parent = scroll
+
+-- 3. Compact Swap Button (Action Phase)
+local swapBtn = Instance.new("TextButton")
+swapBtn.Size = UDim2.new(1, -10, 1, -40)
+swapBtn.Position = UDim2.new(0, 5, 0, 35)
+swapBtn.BackgroundColor3 = SWAP_COLOR
+swapBtn.Text = "SWAP"
+swapBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+swapBtn.Font = Enum.Font.SourceSansBold
+swapBtn.TextSize = 20
+swapBtn.Visible = false
+swapBtn.Parent = mainFrame
+Instance.new("UICorner", swapBtn)
+
+-- Small "Back" button for the compact mode
+local backBtn = Instance.new("TextButton")
+backBtn.Size = UDim2.new(0, 20, 0, 20)
+backBtn.Position = UDim2.new(1, -25, 0, 5)
+backBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+backBtn.Text = "X"
+backBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+backBtn.Visible = false
+backBtn.Parent = mainFrame
+Instance.new("UICorner", backBtn, UDim.new(1, 0))
+
+-- 4. Logic
+local targetPlayer = nil
+
+local function updateList()
+    for _, v in pairs(scroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+    for _, p in pairs(game.Players:GetPlayers()) do
+        if p ~= game.Players.LocalPlayer then
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, 0, 0, 30)
+            b.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            b.Text = p.DisplayName
+            b.TextColor3 = Color3.fromRGB(255, 255, 255)
+            b.Parent = scroll
+            Instance.new("UICorner", b)
+            
+            b.MouseButton1Click:Connect(function()
+                targetPlayer = p
+                -- SHRINK UI
+                mainFrame.Size = UDim2.new(0, 100, 0, 80) 
+                title.Text = "Targeting"
+                title.TextSize = 12
+                scroll.Visible = false
+                swapBtn.Visible = true
+                backBtn.Visible = true
+            end)
+        end
+    end
+end
+
+-- Teleport Logic
+swapBtn.MouseButton1Click:Connect(function()
+    local lp = game.Players.LocalPlayer
+    if targetPlayer and targetPlayer.Character and lp.Character then
+        local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
+        local hisRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot and hisRoot then
+            myRoot.CFrame = hisRoot.CFrame
+        end
+    end
+end)
+
+-- Reset UI
+backBtn.MouseButton1Click:Connect(function()
+    mainFrame.Size = UDim2.new(0, 200, 0, 250)
+    title.Text = "Select Player"
+    title.TextSize = 16
+    scroll.Visible = true
+    swapBtn.Visible = false
+    backBtn.Visible = false
+    targetPlayer = nil
+end)
+
+game.Players.PlayerAdded:Connect(updateList)
+game.Players.PlayerRemoving:Connect(updateList)
+updateList()
+
