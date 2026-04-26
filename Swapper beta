@@ -2,7 +2,7 @@ local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local ANIM_ID = "rbxassetid://86505219150915"
 
--- 1. THE SIGNAL BRIDGE
+-- 1. BRIDGE SETUP
 local function createBridge()
     local folder = lp:FindFirstChild("SyncBridge") or Instance.new("Folder", lp)
     folder.Name = "SyncBridge"
@@ -12,111 +12,114 @@ local function createBridge()
 end
 createBridge()
 
--- 2. BETTER GUI SETUP
+-- 2. MODERN COMPACT GUI
 local sg = Instance.new("ScreenGui", game:GetService("CoreGui"))
-sg.Name = "SleekSwap"
+sg.Name = "NanoSwap"
 
 local main = Instance.new("Frame", sg)
-main.Size = UDim2.new(0, 200, 0, 260)
-main.Position = UDim2.new(0.1, 0, 0.4, 0)
-main.BackgroundColor3 = Color3.fromRGB(30, 31, 35)
+main.Size = UDim2.new(0, 200, 0, 220)
+main.Position = UDim2.new(0.05, 0, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 main.BorderSizePixel = 0
 main.Active = true
 main.Draggable = true
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
-
--- Subtle Gradient for the GUI
-local grad = Instance.new("UIGradient", main)
-grad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 200, 200))
-grad.Rotation = 45
+local corner = Instance.new("UICorner", main)
+corner.CornerRadius = UDim.new(0, 10)
 
 local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Text = "SWAP REPLICATION"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "SELECT PLAYER"
+title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
+title.TextSize = 12
 title.BackgroundTransparency = 1
 
 local scroll = Instance.new("ScrollingFrame", main)
-scroll.Size = UDim2.new(1, -20, 1, -60)
-scroll.Position = UDim2.new(0, 10, 0, 45)
+scroll.Size = UDim2.new(1, -10, 1, -40)
+scroll.Position = UDim2.new(0, 5, 0, 35)
 scroll.BackgroundTransparency = 1
-scroll.ScrollBarThickness = 2
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.ScrollBarThickness = 0
 local layout = Instance.new("UIListLayout", scroll)
-layout.Padding = UDim.new(0, 8)
+layout.Padding = UDim.new(0, 5)
 
--- 3. THE CORE FUNCTIONS
+-- 3. THE CORE SWAP LOGIC
 local target = nil
 
-local function playSwapAnim()
-    local char = lp.Character
-    if char and char:FindFirstChild("Humanoid") then
+local function playAnimAndSwap()
+    if not target or not target.Character or not lp.Character then return end
+    
+    local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
+    local hisRoot = target.Character:FindFirstChild("HumanoidRootPart")
+    local myHum = lp.Character:FindFirstChild("Humanoid")
+    
+    if myRoot and hisRoot and myHum then
+        -- Load and Play Anim
         local anim = Instance.new("Animation")
         anim.AnimationId = ANIM_ID
-        local load = char.Humanoid:LoadAnimation(anim)
+        local load = myHum:LoadAnimation(anim)
         load:Play()
+        
+        -- Timing: Wait for the animation's "action point" before snapping
+        -- Adjust this wait time to match when the animation looks best for a swap
+        task.wait(0.6) 
+        
+        -- The Physical Swap
+        myRoot.CFrame = hisRoot.CFrame
     end
 end
 
-local function doSwap()
-    if target and target.Character and lp.Character then
-        local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
-        local hisRoot = target.Character:FindFirstChild("HumanoidRootPart")
-        if myRoot and hisRoot then
-            playSwapAnim()
-            -- Small delay so the animation starts before the snap
-            task.wait(0.1) 
-            myRoot.CFrame = hisRoot.CFrame
-        end
-    end
-end
-
--- Listening for Partner
+-- Listen for his trigger
 local function listen(partner)
     local bridge = partner:WaitForChild("SyncBridge", 10)
     if bridge then
         bridge.Trigger.Changed:Connect(function()
-            doSwap() -- He clicked, so we trigger on our end
+            playAnimAndSwap() -- He clicked, so we play anim and move
         end)
     end
 end
 
--- 4. BUTTON LOGIC
+-- 4. BUTTONS & UI TRANSITION
 local function updateList()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= lp then
             local b = Instance.new("TextButton", scroll)
-            b.Size = UDim2.new(1, 0, 0, 35)
-            b.BackgroundColor3 = Color3.fromRGB(45, 47, 53)
+            b.Size = UDim2.new(1, 0, 0, 30)
+            b.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
             b.Text = p.DisplayName
-            b.TextColor3 = Color3.fromRGB(220, 220, 220)
+            b.TextColor3 = Color3.new(1, 1, 1)
             b.Font = Enum.Font.Gotham
-            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+            b.TextSize = 11
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
 
             b.MouseButton1Click:Connect(function()
                 target = p
                 listen(p)
-                scroll.Visible = false
-                title.Text = "LINKED: " .. p.Name
                 
-                local bigBtn = Instance.new("TextButton", main)
-                bigBtn.Size = UDim2.new(0.8, 0, 0, 80)
-                bigBtn.Position = UDim2.new(0.1, 0, 0.4, 0)
-                bigBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 255)
-                bigBtn.Text = "EXECUTE SWAP"
-                bigBtn.TextColor3 = Color3.new(1,1,1)
-                bigBtn.Font = Enum.Font.GothamBold
-                Instance.new("UICorner", bigBtn).CornerRadius = UDim.new(0, 10)
+                -- SHRINK UI
+                scroll.Visible = false
+                main:TweenSize(UDim2.new(0, 120, 0, 60), "Out", "Quad", 0.3, true)
+                title.Text = "READY: " .. p.Name:upper()
+                title.TextSize = 8
+                
+                local sBtn = Instance.new("TextButton", main)
+                sBtn.Size = UDim2.new(0.9, 0, 0, 25)
+                sBtn.Position = UDim2.new(0.05, 0, 0.5, 0)
+                sBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+                sBtn.Text = "SWAP"
+                sBtn.Font = Enum.Font.GothamBold
+                sBtn.TextColor3 = Color3.new(1, 1, 1)
+                sBtn.TextSize = 12
+                Instance.new("UICorner", sBtn)
 
-                bigBtn.MouseButton1Click:Connect(function()
+                sBtn.MouseButton1Click:Connect(function()
+                    -- Increment our value to signal his script
                     lp.SyncBridge.Trigger.Value = lp.SyncBridge.Trigger.Value + 1
-                    doSwap() -- Trigger for us
+                    -- Play for ourselves
+                    playAnimAndSwap()
                 end)
             end)
         end
     end
-    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
 end
 
 updateList()
