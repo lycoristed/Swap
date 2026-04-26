@@ -1,139 +1,101 @@
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
 local lp = Players.LocalPlayer
 
-local TAG_NAME = "SyncActive_Token"
-local REQUEST_TAG = "SwapRequest" 
-
--- 1. Setup Tags (This tells the other person you are ready)
-local function setupTags(char)
-    if not char then return end
-    local tag = char:FindFirstChild(TAG_NAME) or Instance.new("StringValue")
-    tag.Name = TAG_NAME
-    tag.Parent = char
+-- 1. THE SIGNAL SYSTEM (The 'Replication' bridge)
+-- We use a StringValue in the Player folder. It's visible to all clients.
+local function createBridge()
+    local folder = lp:FindFirstChild("ReplicationBridge") or Instance.new("Folder", lp)
+    folder.Name = "ReplicationBridge"
     
-    local req = char:FindFirstChild(REQUEST_TAG) or Instance.new("StringValue")
-    req.Name = REQUEST_TAG
-    req.Value = ""
-    req.Parent = char
+    local swapSignal = folder:FindFirstChild("SwapEvent") or Instance.new("StringValue", folder)
+    swapSignal.Name = "SwapEvent"
+    swapSignal.Value = ""
 end
-setupTags(lp.Character or lp.CharacterAdded:Wait())
-lp.CharacterAdded:Connect(setupTags)
+createBridge()
 
--- 2. UI Creation
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FinalSyncSwap"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = CoreGui
+-- 2. THE UI (Minimalist version to prevent 'Black Screen' issues)
+local sg = Instance.new("ScreenGui", lp:WaitForChild("PlayerGui"))
+local frame = Instance.new("Frame", sg)
+frame.Size = UDim2.new(0, 180, 0, 200)
+frame.Position = UDim2.new(0.4, 0, 0.4, 0)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.Active = true
+frame.Draggable = true
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 250)
-mainFrame.Position = UDim2.new(0.1, 0, 0.4, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame)
-
-local title = Instance.new("TextLabel")
+local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "Waiting for Partner..."
+title.Text = "Sync Swapper"
 title.TextColor3 = Color3.new(1, 1, 1)
-title.BackgroundTransparency = 1
-title.Parent = mainFrame
+title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 
-local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -10, 1, -40)
-scroll.Position = UDim2.new(0, 5, 0, 35)
-scroll.BackgroundTransparency = 1
-scroll.ScrollBarThickness = 4
-scroll.Parent = mainFrame
+local target = nil
 
-local layout = Instance.new("UIListLayout", scroll)
-layout.Padding = UDim.new(0, 5)
-
-local swapBtn = Instance.new("TextButton")
-swapBtn.Size = UDim2.new(1, -10, 1, -40)
-swapBtn.Position = UDim2.new(0, 5, 0, 35)
-swapBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-swapBtn.Text = "SWAP"
-swapBtn.Visible = false
-swapBtn.Parent = mainFrame
-Instance.new("UICorner", swapBtn)
-
--- 3. The Sync Logic
-local targetPlayer = nil
-
-local function moveMe()
-    if targetPlayer and targetPlayer.Character and lp.Character then
-        local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
-        local hisRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if myRoot and hisRoot then
-            myRoot.CFrame = hisRoot.CFrame
-        end
+-- 3. THE REPLICATION LOGIC
+local function performLocalTeleport(pos)
+    if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+        lp.Character.HumanoidRootPart.CFrame = pos
     end
 end
 
--- This watches HIS character for the "Trigger" signal
-local function listenForPartner(partner)
-    partner.CharacterAdded:Connect(function(char)
-        local req = char:WaitForChild(REQUEST_TAG, 10)
-        if req then
-            req.Changed:Connect(function(val)
-                if val == "Trigger" then moveMe() end
-            end)
-        end
-    end)
-    -- Initial check
-    local req = partner.Character and partner.Character:FindFirstChild(REQUEST_TAG)
-    if req then
-        req.Changed:Connect(function(val)
-            if val == "Trigger" then moveMe() end
+-- This listens for your friend's signal
+local function connectToPartner(partner)
+    local bridge = partner:WaitForChild("ReplicationBridge", 10)
+    if bridge then
+        bridge.SwapEvent.Changed:Connect(function(val)
+            if val ~= "" and lp.Character and partner.Character then
+                -- YOUR script hears HIS signal and moves YOU to HIM
+                local hisPos = partner.Character.HumanoidRootPart.CFrame
+                performLocalTeleport(hisPos)
+                print("Replicated swap from partner")
+            end
         end)
     end
 end
 
--- When YOU click
-swapBtn.MouseButton1Click:Connect(function()
-    local myReq = lp.Character and lp.Character:FindFirstChild(REQUEST_TAG)
-    if myReq then
-        moveMe() -- Move yourself
-        myReq.Value = "Trigger" -- Signal him to move
-        task.wait(0.2)
-        myReq.Value = "" -- Reset
-    end
-end)
-
--- Update List
-local function updateList()
-    for _, v in pairs(scroll:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
-    
+-- 4. BUTTONS
+local function makeButtons()
+    local yOffset = 35
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= lp and p.Character and p.Character:FindFirstChild(TAG_NAME) then
-            title.Text = "User Detected!"
-            local btn = Instance.new("TextButton", scroll)
-            btn.Size = UDim2.new(1, -5, 0, 35)
-            btn.Text = p.DisplayName
-            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            btn.TextColor3 = Color3.new(1, 1, 1)
-            Instance.new("UICorner", btn)
-            
-            btn.MouseButton1Click:Connect(function()
-                targetPlayer = p
-                listenForPartner(p)
-                scroll.Visible = false
-                swapBtn.Visible = true
-                mainFrame.Size = UDim2.new(0, 100, 0, 80)
-                title.Text = "Linked"
+        if p ~= lp then
+            local b = Instance.new("TextButton", frame)
+            b.Size = UDim2.new(0.9, 0, 0, 25)
+            b.Position = UDim2.new(0.05, 0, 0, yOffset)
+            b.Text = p.Name
+            b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            b.TextColor3 = Color3.new(1, 1, 1)
+
+            b.MouseButton1Click:Connect(function()
+                target = p
+                connectToPartner(p)
+                
+                -- Clear UI and show the Swap button
+                for _, child in pairs(frame:GetChildren()) do
+                    if child:IsA("TextButton") then child:Destroy() end
+                end
+                
+                local sBtn = Instance.new("TextButton", frame)
+                sBtn.Size = UDim2.new(0.9, 0, 0, 60)
+                sBtn.Position = UDim2.new(0.05, 0, 0, 50)
+                sBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+                sBtn.Text = "SWAP PLACES"
+                sBtn.TextColor3 = Color3.new(1, 1, 1)
+
+                sBtn.MouseButton1Click:Connect(function()
+                    if target and target.Character then
+                        local myBridge = lp.ReplicationBridge.SwapEvent
+                        local targetPos = target.Character.HumanoidRootPart.CFrame
+                        
+                        -- 1. Move yourself
+                        performLocalTeleport(targetPos)
+                        
+                        -- 2. Signal him to move (This is the 'replication')
+                        myBridge.Value = tostring(math.random(1, 100000)) 
+                    end
+                end)
             end)
+            yOffset = yOffset + 30
         end
     end
-    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
 end
 
--- Refresh frequently
-task.spawn(function()
-    while task.wait(1) do 
-        if scroll.Visible then updateList() end 
-    end
-end)
+makeButtons()
