@@ -1,10 +1,10 @@
 -- Settings
 local MAIN_COLOR = Color3.fromRGB(20, 20, 20)
-local ACCENT_COLOR = Color3.fromRGB(0, 160, 255)
+local SWAP_COLOR = Color3.fromRGB(85, 0, 255) -- Purple for sync swap
 
 -- 1. Main UI Setup
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ProSwapGui"
+screenGui.Name = "SyncSwapGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = game:GetService("CoreGui")
 
@@ -23,7 +23,7 @@ corner.Parent = mainFrame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
-title.Text = "Select Player"
+title.Text = "Select Partner"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 16
@@ -36,23 +36,22 @@ scroll.Position = UDim2.new(0, 5, 0, 35)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 4
-scroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0) -- This will update automatically
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout")
 layout.Padding = UDim.new(0, 5)
 layout.Parent = scroll
 
--- 3. BUTTONS (Hidden until selection)
+-- 3. SWAP BUTTON
 local swapBtn = Instance.new("TextButton")
 swapBtn.Size = UDim2.new(1, -10, 1, -40)
 swapBtn.Position = UDim2.new(0, 5, 0, 35)
-swapBtn.BackgroundColor3 = ACCENT_COLOR
-swapBtn.Text = "SWAP"
+swapBtn.BackgroundColor3 = SWAP_COLOR
+swapBtn.Text = "SWAP PLACES"
 swapBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 swapBtn.Font = Enum.Font.SourceSansBold
-swapBtn.TextSize = 24
+swapBtn.TextSize = 18
 swapBtn.Visible = false
 swapBtn.Parent = mainFrame
 Instance.new("UICorner", swapBtn)
@@ -67,41 +66,73 @@ backBtn.Visible = false
 backBtn.Parent = mainFrame
 Instance.new("UICorner", backBtn, UDim.new(1, 0))
 
--- 4. LOGIC & REFRESHING
+-- 4. THE SWAP LOGIC
 local targetPlayer = nil
 
 local function updateList()
-    -- Clear current list
     for _, item in pairs(scroll:GetChildren()) do
         if item:IsA("TextButton") then item:Destroy() end
     end
-    
-    -- Add players
     for _, p in pairs(game.Players:GetPlayers()) do
         if p ~= game.Players.LocalPlayer then
             local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -5, 0, 35) -- Fixed height for list items
+            btn.Size = UDim2.new(1, -5, 0, 35)
             btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
             btn.Text = p.DisplayName
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Font = Enum.Font.SourceSans
-            btn.TextSize = 14
             btn.Parent = scroll
             Instance.new("UICorner", btn)
             
             btn.MouseButton1Click:Connect(function()
                 targetPlayer = p
-                mainFrame.Size = UDim2.new(0, 100, 0, 80) -- Shrink
-                title.Text = "Swap Active"
-                title.TextSize = 12
+                mainFrame.Size = UDim2.new(0, 120, 0, 80) -- Smaller compact size
+                title.Text = "Partner: " .. p.Name
+                title.TextSize = 10
                 scroll.Visible = false
                 swapBtn.Visible = true
                 backBtn.Visible = true
             end)
         end
     end
-    
-    -- IMPORTANT: Update the scrollable area size
+    scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+end
+
+swapBtn.MouseButton1Click:Connect(function()
+    local lp = game.Players.LocalPlayer
+    if targetPlayer and targetPlayer.Character and lp.Character then
+        local myRoot = lp.Character:FindFirstChild("HumanoidRootPart")
+        local hisRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
+        if myRoot and hisRoot then
+            -- TRADING LOCATIONS:
+            -- We grab BOTH positions before moving anyone
+            local myOldCF = myRoot.CFrame
+            local hisOldCF = hisRoot.CFrame
+            
+            -- Move me to him
+            myRoot.CFrame = hisOldCF
+            
+            -- Move him to me
+            -- (Note: This may only work if the game allows you to move others, 
+            -- or if he is also running the script and you both click near-simultaneously)
+            hisRoot.CFrame = myOldCF
+        end
+    end
+end)
+
+backBtn.MouseButton1Click:Connect(function()
+    targetPlayer = nil
+    mainFrame.Size = UDim2.new(0, 200, 0, 250)
+    title.Text = "Select Partner"
+    title.TextSize = 16
+    scroll.Visible = true
+    swapBtn.Visible = false
+    backBtn.Visible = false
+end)
+
+game.Players.PlayerAdded:Connect(updateList)
+game.Players.PlayerRemoving:Connect(updateList)
+updateList()
     scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
 end
 
